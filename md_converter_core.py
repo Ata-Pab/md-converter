@@ -50,6 +50,33 @@ _PIP_NAMES = {
 }
 
 
+# Packages each group of formats needs: import name -> (pip name, formats).
+FORMAT_PACKAGES = {
+    "openpyxl": ("openpyxl", ".xlsx/.xlsm"),
+    "xlrd": ("xlrd", ".xls"),
+    "odf": ("odfpy", ".ods/.odt"),
+    "docx": ("python-docx", ".docx"),
+    "pptx": ("python-pptx", ".pptx"),
+    "pdfplumber": ("pdfplumber", ".pdf"),
+}
+
+
+def missing_packages():
+    """[(pip name, formats)] for the converter packages that cannot be
+    imported, e.g. in an .exe built with a Python that lacked them."""
+    import importlib.util
+
+    missing = []
+    for module, info in FORMAT_PACKAGES.items():
+        try:
+            found = importlib.util.find_spec(module) is not None
+        except (ImportError, ValueError):
+            found = False
+        if not found:
+            missing.append(info)
+    return missing
+
+
 def describe_error(exc):
     """Readable one-line message for an exception. A missing optional
     package becomes an install hint instead of a bare ImportError."""

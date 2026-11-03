@@ -6,7 +6,7 @@ folder) or run the commands below from the project folder.
 
 | File | Type | What it shows |
 |---|---|---|
-| `requirements.xlsx` | Excel | The default requirements filter: rows whose `Property` contains *gereksinim* (also `GEREKSİNİM` and `Güvenlik gereksinimi`); *Bilgi*, *Not* and *Başlık* rows are left out. Has an empty row, pipes, `<admin>` and `*` in the text. Second sheet **Revisions** has its column names on **row 4**. |
+| `requirements.xlsx` | Excel | A requirements filter: type *gereksinim* in the `Property` filter row to keep those rows (also `GEREKSİNİM` and `Güvenlik gereksinimi`); *Bilgi*, *Not* and *Başlık* rows are left out. Has an empty row, pipes, `<admin>` and `*` in the text. Second sheet **Revisions** has its column names on **row 4**. |
 | `test-cases.xlsm` | Excel (macro-enabled) | Multi-line *Steps* cells (try *Line breaks as `<br>`*) and a *Result* column to filter on (`equals` → `Fail`). |
 | `legacy-requirements.xls` | Excel 97-2003 | The old format with `ID`, `Description`, `Property` columns. |
 | `risk-register.ods` | LibreOffice Calc | A numeric *Score* column: sort it Z → A, or filter *Status* with a regex such as `open\|mitigated`. |

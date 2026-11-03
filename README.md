@@ -4,8 +4,8 @@ Convert spreadsheets and documents into clean Markdown.
 
 - **Spreadsheets** (`.xlsx`, `.xlsm`, `.xls`, `.ods`): pick the columns to
   keep, filter and sort the rows, and get a Markdown table with a total count.
-  Works with Turkish sheets too: by default rows are matched on the word
-  `gereksinim` in the `Property` column.
+  Works with Turkish sheets too: filtering `Property` on the word
+  `gereksinim` also matches `GEREKSİNİM` and `gereksinimler`.
 - **Documents** (`.docx`, `.pptx`, `.odt`, `.pdf`): the whole file is
   converted in reading order: headings, paragraphs, bullet and numbered
   lists, tables, links and, for slides, speaker notes.
@@ -36,6 +36,8 @@ Convert spreadsheets and documents into clean Markdown.
 | `md-converter.py` | Command-line version. |
 | `md_converter_core.py` | Conversion logic shared by the GUI and the CLI. |
 | `requirements.txt` | Python packages to install. |
+| `build-exe.bat`, `md-converter-ui.spec` | Build the Windows `.exe` (see below). |
+| `example/` | One sample file per supported type. |
 
 ## Requirements
 
@@ -107,12 +109,20 @@ Run `python md-converter.py --help` for every option.
 
 ### Windows executable
 
+Double-click `build-exe.bat` (or run it in a terminal). It installs the
+requirements and PyInstaller into the Python on your `PATH` and writes
+`dist\md-converter-ui.exe`. The same thing by hand:
+
 ```bash
-pip install pyinstaller
-pyinstaller --onefile --windowed --name md-converter-ui md-converter-ui.py
-# with drag & drop:
-pyinstaller --onefile --windowed --name md-converter-ui --collect-all tkinterdnd2 md-converter-ui.py
+python -m pip install -r requirements.txt pyinstaller
+python -m PyInstaller --noconfirm md-converter-ui.spec
 ```
+
+Use `python -m PyInstaller`, not the bare `pyinstaller` command: with several
+Python versions installed, `pyinstaller` can belong to one that lacks the
+converter packages, and that `.exe` then fails with *Could not convert this
+file*. The `.spec` file now stops the build with a clear message in that
+case. Drag & drop is included when `tkinterdnd2` is installed.
 
 ## Notes and limits
 

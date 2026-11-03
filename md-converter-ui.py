@@ -169,7 +169,8 @@ class SheetSettings:
 def adapt_settings(settings, columns):
     """Keep only the parts of `settings` that fit `columns` (names matched
     case-insensitively). With no usable output column, fall back to the
-    classic requirements layout: ID + Description, filtered on Property."""
+    classic requirements layout: ID + Description, with an empty filter on
+    Property ready to be filled in."""
     def match(name):
         return core.find_column(columns, name) if name else None
 
@@ -181,7 +182,7 @@ def adapt_settings(settings, columns):
         settings.columns = [c for c in (match("ID"), match("Description")) if c]
         prop = match("Property")
         if settings.columns and prop and not settings.rules:
-            settings.rules = [{"column": prop, "op": "word", "value": core.DEFAULT_FILTER_WORD}]
+            settings.rules = [{"column": prop, "op": "word", "value": ""}]
     return settings
 
 
@@ -430,9 +431,27 @@ class App(tk.Tk):
         self._bind_keys()
         self._restore_window()
         self._refresh_all()
+        self._report_missing_packages()
         self._pump_job = self.after(40, self._pump)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
         self.deiconify()
+
+    def _report_missing_packages(self):
+        """Say up front which formats cannot be converted, instead of only
+        failing file by file (e.g. an .exe built with the wrong Python)."""
+        missing = core.missing_packages()
+        if not missing:
+            return
+        names = ", ".join(pkg for pkg, _ in missing)
+        formats = ", ".join(fmt for _, fmt in missing)
+        if getattr(sys, "frozen", False):
+            fix = ("This program was built without them: rebuild it with build-exe.bat "
+                   "(see the README).")
+        else:
+            fix = "Install them with:  pip install " + " ".join(pkg for pkg, _ in missing)
+        self._log(f"Missing packages: {names}. These formats cannot be converted: {formats}. {fix}",
+                  "error")
+        self._set_status(f"Some formats are unavailable (missing {names}). See the Log tab.", "warn")
 
     def px(self, n):
         return int(round(n * self.scale))
