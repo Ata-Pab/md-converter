@@ -1,0 +1,9 @@
+pandas
+openpyxl      # .xlsx / .xlsm
+xlrd          # old .xls
+python-docx   # .docx
+python-pptx   # .pptx
+odfpy         # .odt / .ods
+pdfplumber    # .pdf
+# Optional, for drag & drop in the GUI:
+# tkinterdnd2
