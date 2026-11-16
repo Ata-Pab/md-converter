@@ -35,6 +35,7 @@ Convert spreadsheets and documents into clean Markdown.
 | `md-converter-ui.py` | Desktop GUI (Tkinter) with live preview. |
 | `md-converter.py` | Command-line version. |
 | `md_converter_core.py` | Conversion logic shared by the GUI and the CLI. |
+| `ui_theme.py` | Light and dark colours of the GUI and the live theme switch (shared with the DOCX to LaTeX Converter; keep the two copies the same). |
 | `requirements.txt` | Python packages to install. |
 | `build-exe.bat`, `md-converter-ui.spec` | Build the Windows `.exe` (see below). |
 | `example/` | One sample file per supported type. |
@@ -79,8 +80,14 @@ Shortcuts: `Ctrl+O` add files, `Ctrl+Shift+O` add folder, `Delete` remove,
 `Ctrl+Enter` convert selected, `Ctrl+Shift+Enter` convert all, `F5` reload the
 file from disk. Right-click a file for more actions.
 
+**Theme** (top right): *Light*, *Dark*, or *System*, which follows the Windows
+setting for apps (Settings → Personalisation → Colours) and changes with it
+while the program runs. The choice is applied at once; the title bar turns
+dark too (Windows 10 20H1 and later). The colours of both themes are in
+`ui_theme.py` (the same file as in the DOCX to LaTeX Converter).
+
 Your choices (output folder, document options, last spreadsheet settings,
-window size) are remembered in `%APPDATA%\MD-Converter\settings.json`
+theme, window size) are remembered in `%APPDATA%\MD-Converter\settings.json`
 (`~/.config/md-converter/settings.json` on macOS/Linux).
 
 ### Command line

@@ -13,6 +13,7 @@ documents (.docx/.pptx/.odt/.pdf) to Markdown.
   - Live Markdown preview of the highlighted file
   - Convert the selected files or all of them, one .md per file or merged
     into a single .md
+  - Light, dark or system (follows Windows) theme
 
 Builds on md_converter_core, shared with md-converter.py.
 """
@@ -34,6 +35,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 import md_converter_core as core
+import ui_theme
 
 try:  # optional drag & drop support
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -60,29 +62,9 @@ FILE_DIALOG_TYPES = [
 # --------------------------------------------------------------------------- #
 #  Look
 # --------------------------------------------------------------------------- #
-C = {
-    "bg": "#f3f5f9",
-    "card": "#ffffff",
-    "border": "#e1e5ec",
-    "border_strong": "#c9d1de",
-    "fg": "#1f2430",
-    "muted": "#6b7280",
-    "faint": "#9aa3b2",
-    "accent": "#2f6fed",
-    "accent_hover": "#2458c7",
-    "accent_pressed": "#1f4fb5",
-    "accent_soft": "#e8efff",
-    "accent_disabled": "#a9c0f5",
-    "field": "#ffffff",
-    "hover": "#f1f4f9",
-    "pressed": "#e5e9f0",
-    "code_bg": "#fbfcfe",
-    "heading": "#1d4ed8",
-    "success": "#15803d",
-    "danger": "#dc2626",
-    "warn": "#b45309",
-    "tooltip": "#1f2430",
-}
+# The colours of the current theme (ui_theme.LIGHT or DARK); widgets read them
+# when they are made, and _apply_theme swaps them while the program runs.
+C = dict(ui_theme.LIGHT)
 
 DOC_OPTIONS = (
     ("include_header_footer", "Include headers & footers", False,
@@ -396,10 +378,14 @@ class App(tk.Tk):
         super().__init__()
         self.withdraw()
         self.title(APP_NAME)
+        self.saved = load_settings()
+        self.theme_choice = self.saved.get("theme", "system")
+        if self.theme_choice not in dict(ui_theme.CHOICES):
+            self.theme_choice = "system"
+        self.theme = ui_theme.resolve(self.theme_choice)
+        ui_theme.apply_palette(C, self.theme)
         self.configure(bg=C["bg"])
         self.scale = max(1.0, self.winfo_fpixels("1i") / 96.0)
-
-        self.saved = load_settings()
         self.files = OrderedDict()          # iid -> FileEntry
         self.focus_iid = None
         self.template = SheetSettings.from_dict(self.saved.get("sheet_template"))
@@ -434,6 +420,9 @@ class App(tk.Tk):
         self._report_missing_packages()
         self._pump_job = self.after(40, self._pump)
         self.protocol("WM_DELETE_WINDOW", self._on_close)
+        ui_theme.dialog_options(self, C)
+        ui_theme.set_title_bar(self, self.theme == "dark")
+        self._theme_job = self.after(3000, self._follow_system_theme)
         self.deiconify()
 
     def _report_missing_packages(self):
@@ -490,7 +479,7 @@ class App(tk.Tk):
             ".", background=C["bg"], foreground=C["fg"], font=self.f_base,
             bordercolor=C["border"], lightcolor=C["card"], darkcolor=C["border"],
             troughcolor=C["bg"], focuscolor=C["accent"], selectbackground=C["accent"],
-            selectforeground="white", insertcolor=C["fg"],
+            selectforeground=C["on_accent"], insertcolor=C["fg"],
         )
         style.configure("TFrame", background=C["bg"])
         style.configure("Card.TFrame", background=C["card"])
@@ -510,7 +499,7 @@ class App(tk.Tk):
                   foreground=[("disabled", C["faint"])],
                   bordercolor=[("disabled", C["border"]), ("focus", C["accent"])],
                   focuscolor=[("pressed", C["pressed"]), ("active", C["hover"])])
-        style.configure("Accent.TButton", background=C["accent"], foreground="white",
+        style.configure("Accent.TButton", background=C["accent"], foreground=C["on_accent"],
                         bordercolor=C["accent"], lightcolor=C["accent"], darkcolor=C["accent"],
                         font=self.f_bold, padding=(px(16), px(6)), focuscolor=C["accent"])
         style.map("Accent.TButton",
@@ -522,7 +511,7 @@ class App(tk.Tk):
                              ("active", C["accent_hover"])],
                   bordercolor=[("disabled", C["accent_disabled"]), ("pressed", C["accent_pressed"]),
                                ("active", C["accent_hover"])],
-                  foreground=[("disabled", "white")],
+                  foreground=[("disabled", C["on_accent"])],
                   focuscolor=[("pressed", C["accent_pressed"]), ("active", C["accent_hover"])])
         style.configure("Small.TButton", padding=(px(8), px(3)))
         style.configure("Icon.TButton", padding=(px(4), px(3)), width=3)
@@ -621,7 +610,7 @@ class App(tk.Tk):
                         foreground=C["fg"], rowheight=px(28), bordercolor=C["border"],
                         lightcolor=C["field"], darkcolor=C["field"], borderwidth=0)
         style.map("Treeview",
-                  background=[("selected", "focus", C["accent_soft"]), ("selected", "#eef1f6")],
+                  background=[("selected", "focus", C["accent_soft"]), ("selected", C["row_selected"])],
                   foreground=[("selected", C["fg"])])
         style.configure("Treeview.Heading", background=C["bg"], foreground=C["muted"],
                         font=self.f_small, relief="flat", bordercolor=C["border"],
@@ -631,17 +620,29 @@ class App(tk.Tk):
 
         # Scrollbars and progress
         for orient in ("Vertical", "Horizontal"):
-            style.configure(f"{orient}.TScrollbar", background="#d5dbe5", troughcolor=C["card"],
-                            bordercolor=C["card"], lightcolor="#d5dbe5", darkcolor="#d5dbe5",
+            style.configure(f"{orient}.TScrollbar", background=C["scroll"], troughcolor=C["card"],
+                            bordercolor=C["card"], lightcolor=C["scroll"], darkcolor=C["scroll"],
                             arrowcolor=C["muted"], gripcount=0, arrowsize=px(12))
             style.map(f"{orient}.TScrollbar",
-                      background=[("disabled", C["card"]), ("active", "#b8c1cf")],
-                      lightcolor=[("disabled", C["card"]), ("active", "#b8c1cf")],
-                      darkcolor=[("disabled", C["card"]), ("active", "#b8c1cf")],
+                      background=[("disabled", C["card"]), ("active", C["scroll_active"])],
+                      lightcolor=[("disabled", C["card"]), ("active", C["scroll_active"])],
+                      darkcolor=[("disabled", C["card"]), ("active", C["scroll_active"])],
                       arrowcolor=[("disabled", C["border"])])
         style.configure("Horizontal.TProgressbar", background=C["accent"], troughcolor=C["pressed"],
                         bordercolor=C["pressed"], lightcolor=C["accent"], darkcolor=C["accent"],
                         thickness=px(6))
+
+    def _blank_image(self, kind, key, width, height):
+        """A PhotoImage to draw on (blank pixels are transparent). When the
+        theme changes the same image is drawn again, so the ttk elements made
+        from it follow."""
+        store = self.__dict__.setdefault("_images", {})
+        img = store.get((kind, key))
+        if img is None:
+            img = store[(kind, key)] = tk.PhotoImage(width=width, height=height)
+        else:
+            img.blank()
+        return img
 
     def _make_check_images(self):
         """Rounded check boxes (plus a gap before the label) as images."""
@@ -649,8 +650,8 @@ class App(tk.Tk):
         line = max(1, self.px(1))
         tick = max(2, self.px(2))
 
-        def make(fill, border, check=None):
-            img = tk.PhotoImage(width=s + gap, height=s)  # blank pixels are transparent
+        def make(key, fill, border, check=None):
+            img = self._blank_image("check", key, s + gap, s)
             img.put(border, to=(0, 0, s, s))
             img.put(fill, to=(line, line, s - line, s - line))
             for x, y in ((0, 0), (s - 1, 0), (0, s - 1), (s - 1, s - 1)):
@@ -667,12 +668,13 @@ class App(tk.Tk):
             return img
 
         self._check_img = {
-            "off": make(C["field"], C["border_strong"]),
-            "off_hover": make(C["field"], C["accent"]),
-            "off_disabled": make(C["bg"], C["border"]),
-            "on": make(C["accent"], C["accent"], "white"),
-            "on_hover": make(C["accent_hover"], C["accent_hover"], "white"),
-            "on_disabled": make(C["accent_disabled"], C["accent_disabled"], "white"),
+            "off": make("off", C["field"], C["border_strong"]),
+            "off_hover": make("off_hover", C["field"], C["accent"]),
+            "off_disabled": make("off_disabled", C["bg"], C["border"]),
+            "on": make("on", C["accent"], C["accent"], "white"),
+            "on_hover": make("on_hover", C["accent_hover"], C["accent_hover"], "white"),
+            "on_disabled": make("on_disabled", C["accent_disabled"], C["accent_disabled"],
+                                "white"),
         }
 
         def rgb(color):
@@ -681,9 +683,9 @@ class App(tk.Tk):
         def blend(a, b, t):
             return tuple(round(x + (y - x) * t) for x, y in zip(a, b))
 
-        def radio(fill, border, dot=None):
+        def radio(key, fill, border, dot=None):
             """Anti-aliased (4x4 supersampled) round indicator."""
-            img = tk.PhotoImage(width=s + gap, height=s)
+            img = self._blank_image("radio", key, s + gap, s)
             r, ring, dot_r = s / 2, line + 0.4, s * 0.2
             for y in range(s):
                 for x in range(s):
@@ -705,18 +707,19 @@ class App(tk.Tk):
             return img
 
         self._radio_img = {
-            "off": radio(C["field"], C["border_strong"]),
-            "off_hover": radio(C["field"], C["accent"]),
-            "off_disabled": radio(C["bg"], C["border"]),
-            "on": radio(C["accent"], C["accent"], "#ffffff"),
-            "on_hover": radio(C["accent_hover"], C["accent_hover"], "#ffffff"),
-            "on_disabled": radio(C["accent_disabled"], C["accent_disabled"], "#ffffff"),
+            "off": radio("off", C["field"], C["border_strong"]),
+            "off_hover": radio("off_hover", C["field"], C["accent"]),
+            "off_disabled": radio("off_disabled", C["bg"], C["border"]),
+            "on": radio("on", C["accent"], C["accent"], "#ffffff"),
+            "on_hover": radio("on_hover", C["accent_hover"], C["accent_hover"], "#ffffff"),
+            "on_disabled": radio("on_disabled", C["accent_disabled"], C["accent_disabled"],
+                                 "#ffffff"),
         }
 
     def _set_icon(self):
         """A small accent-blue square with a white down arrow."""
         size = 32
-        img = tk.PhotoImage(width=size, height=size)
+        img = self._blank_image("icon", "app", size, size)
         img.put(C["accent"], to=(0, 0, size, size))
         for x, y in ((0, 0), (size - 1, 0), (0, size - 1), (size - 1, size - 1)):
             img.put(C["bg"], to=(x, y, x + 1, y + 1))
@@ -820,7 +823,7 @@ class App(tk.Tk):
         px = self.px
         header = tk.Frame(self.shell, bg=C["card"])
         header.grid(row=0, column=0, sticky="ew")
-        logo = tk.Label(header, text="M↓", bg=C["accent"], fg="white",
+        logo = tk.Label(header, text="M↓", bg=C["accent"], fg=C["on_accent"],
                         font=(self.f_title[0], self.f_title[1] - 2, "bold"),
                         width=3, pady=px(2))
         logo.pack(side="left", padx=(px(20), px(12)), pady=px(12))
@@ -832,6 +835,78 @@ class App(tk.Tk):
         help_btn = ttk.Button(header, text="Shortcuts", style="Small.TButton",
                               command=self._show_shortcuts, cursor="hand2")
         help_btn.pack(side="right", padx=px(20))
+        self._build_theme_switch(header).pack(side="right")
+
+    # ---------------------------------------------------------------- theme
+    def _build_theme_switch(self, parent):
+        """Light | Dark | System, as one segmented control."""
+        px = self.px
+        box = tk.Frame(parent, bg=C["card"])
+        self._label(box, "Theme", muted=True, small=True).pack(side="left", padx=(0, px(8)))
+        outline = tk.Frame(box, bg=C["border_strong"], padx=1, pady=1)
+        outline.pack(side="left")
+        self._theme_segments = {}
+        tips = {"light": "Light theme", "dark": "Dark theme",
+                "system": "Follow Windows: light or dark, as set for apps in the Windows "
+                          "colour settings"}
+        for i, (value, text) in enumerate(ui_theme.CHOICES):
+            seg = tk.Label(outline, text=text, font=self.f_small, padx=px(11), pady=px(3),
+                           cursor="hand2", bd=0)
+            seg.pack(side="left", padx=(1 if i else 0, 0))   # the gap shows the outline
+            seg.bind("<Button-1>", lambda e, v=value: self._set_theme(v))
+            seg.bind("<Enter>", lambda e, v=value: self._paint_theme_switch(hover=v), add="+")
+            seg.bind("<Leave>", lambda e: self._paint_theme_switch(), add="+")
+            Tooltip(seg, tips[value])
+            self._theme_segments[value] = seg
+        self._paint_theme_switch()
+        return box
+
+    def _paint_theme_switch(self, hover=None):
+        for value, seg in self._theme_segments.items():
+            if value == self.theme_choice:
+                seg.configure(bg=C["accent"], fg=C["on_accent"])
+            elif value == hover:
+                seg.configure(bg=C["hover"], fg=C["fg"])
+            else:
+                seg.configure(bg=C["card"], fg=C["muted"])
+
+    def _set_theme(self, choice):
+        """Light, Dark or System (follows Windows), switched at once."""
+        self.theme_choice = choice
+        self._apply_theme(ui_theme.resolve(choice))
+        self._paint_theme_switch()
+        self.saved["theme"] = choice
+        save_settings(self.saved)
+        name = dict(ui_theme.CHOICES)[choice]
+        if choice == "system":
+            name += f" (now {self.theme})"
+        self._set_status(f"Theme: {name}.", "info")
+
+    def _apply_theme(self, name):
+        """Recolour the whole window with palette `name` ('light' or 'dark')."""
+        if name == self.theme:
+            return
+        self.theme = name
+        mapping = ui_theme.apply_palette(C, name)
+        self._setup_style()                 # ttk styles and the check/radio pictures
+        ui_theme.recolor(self, mapping)     # tk widgets, text tags, list rows, menus
+        ui_theme.style_combobox_lists(self, C)
+        ui_theme.dialog_options(self, C)
+        ui_theme.set_title_bar(self, name == "dark")
+        self._set_icon()
+        self._paint_theme_switch()
+
+    def _follow_system_theme(self):
+        """In System mode, follow Windows when its setting changes."""
+        self._theme_job = None
+        try:
+            if self.theme_choice == "system":
+                name = ui_theme.system_theme()
+                if name != self.theme:
+                    self._apply_theme(name)
+            self._theme_job = self.after(3000, self._follow_system_theme)
+        except tk.TclError:
+            pass    # closing
 
     # ---------------------------------------------------------------- files
     def _build_files_card(self, parent):
@@ -883,7 +958,9 @@ class App(tk.Tk):
         self.remove_btn.pack(side="right", padx=(0, px(8)))
         Tooltip(self.remove_btn, "Remove the selected files from the list (Delete)")
 
-        self.tree_menu = tk.Menu(self, tearoff=False)
+        self.tree_menu = tk.Menu(self, tearoff=False, bg=C["card"], fg=C["fg"],
+                                 activebackground=C["accent_soft"], activeforeground=C["fg"],
+                                 disabledforeground=C["faint"], relief="flat", bd=1)
         self.tree_menu.add_command(label="Convert", command=lambda: self._convert("selected"))
         self.tree_menu.add_command(label="Reload from disk", command=self._reload_focused)
         self.tree_menu.add_command(label="Show in folder", command=self._reveal_focused)
@@ -1196,7 +1273,8 @@ class App(tk.Tk):
         page = tk.Frame(parent, bg=C["code_bg"])
         text = tk.Text(page, bg=C["code_bg"], fg=C["fg"], font=self.f_mono, relief="flat", bd=0,
                        highlightthickness=0, padx=self.px(14), pady=self.px(10), wrap="none",
-                       insertwidth=0, selectbackground="#cfdcfb", selectforeground=C["fg"],
+                       insertwidth=0, selectbackground=C["select"], selectforeground=C["fg"],
+                       inactiveselectbackground=C["select_inactive"],
                        undo=False, cursor="arrow", spacing1=1, spacing3=1)
         vbar = ttk.Scrollbar(page, orient="vertical", command=text.yview)
         hbar = ttk.Scrollbar(page, orient="horizontal", command=text.xview)
@@ -2608,9 +2686,11 @@ class App(tk.Tk):
             "wrap": self.wrap_var.get(),
             "last_dir": self.last_dir,
             "sheet_template": asdict(self.template) if self.template else None,
+            "theme": self.theme_choice,
         })
         save_settings(data)
-        for job in (getattr(self, "_pump_job", None), self._preview_job, self._header_job):
+        for job in (getattr(self, "_pump_job", None), self._preview_job, self._header_job,
+                    getattr(self, "_theme_job", None)):
             if job:
                 try:
                     self.after_cancel(job)
